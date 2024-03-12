@@ -49,13 +49,14 @@ fn decompress(
     state_mutex: State<'_, Mutex<AppState>>,
     source_path: String,
     target_path: String,
-) -> Result<String, ()> {
+) -> Result<String, String> {
     {
         let mut state = state_mutex.lock().unwrap();
         state.builder = BuilderState::Running;
     }
 
     let result = unzipper::unzip(window, source_path, target_path);
+
     {
         let mut state = state_mutex.lock().unwrap();
         state.builder = BuilderState::Idle;
@@ -63,7 +64,7 @@ fn decompress(
 
     match result {
         Ok(_) => Ok("Decompression successful".to_string()),
-        Err(_) => Err(()),
+        Err(e) => Err(format!("Decompression failed: {:?}", e)),
     }
 }
 
@@ -80,9 +81,7 @@ async fn install_cmus(
         state.builder = BuilderState::Running;
     }
 
-    let folder_path = target_path.clone();
-
-    let install_handle: tokio::task::JoinHandle<Result<String, ()>> = tokio::spawn(install::install(window, app, folder_path));
+    let install_handle = tokio::spawn(install::install(window, app, target_path));
     let result: Result<_, _> = install_handle.await;
 
     {

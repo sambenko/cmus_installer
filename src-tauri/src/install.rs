@@ -31,6 +31,7 @@ pub async fn install(
     let folder_path = Path::new(&target_path);
     let configure_script_path = folder_path.join("configure");
     let install_script_path = folder_path.join("scripts/install");
+    let uninstall_script_path = folder_path.join("scripts/uninstall");
 
     // Set executable permissions for the scripts
     if let Err(err) = set_exec_permission(&configure_script_path) {
@@ -43,15 +44,22 @@ pub async fn install(
         return Err(());
     }
 
+    if let Err(err) = set_exec_permission(&uninstall_script_path) {
+        info!("Failed to set executable permission for uninstall script: {}", err);
+        return Err(());
+    }
+
+
     #[cfg(unix)]
     {
         info!("Running configure script: {:?}", configure_script_path);
         run_external_command_with_progress(
             window.clone(),
             app.clone(),
-            configure_script_path.to_str().unwrap(),
+            "./configure",
             &[],
             PROGRESS_EVENT,
+            Some(folder_path),
         )
         .await?;
 
@@ -62,6 +70,7 @@ pub async fn install(
             "make",
             &["install"],
             PROGRESS_EVENT,
+            Some(folder_path),
         )
         .await?;
     }
@@ -108,18 +117,24 @@ async fn run_external_command_with_progress(
     cmd_name: &str,
     cmd_args: &[&str],
     progress_event: &str,
+    working_dir: Option<&Path>,
 ) -> Result<String, ()> {
     let cmd_name_owned = cmd_name.to_string();
     let cmd_args_owned: Vec<String> = cmd_args.iter().map(|&s| s.to_string()).collect();
 
     info!("Command: {} {}", cmd_name_owned, cmd_args_owned.join(" "));
 
-    let child_result = Command::new(&cmd_name_owned)
-        .args(&cmd_args_owned)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn();
+    let mut command = Command::new(&cmd_name_owned);
+    command.args(&cmd_args_owned);
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
 
+    if let Some(dir) = working_dir {
+        command.current_dir(dir); // Set the current working directory for the command
+    }
+
+    let child_result = command.spawn();
+        
     let mut child = match child_result {
         Ok(child) => child,
         Err(e) => {
