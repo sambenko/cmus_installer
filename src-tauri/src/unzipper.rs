@@ -12,7 +12,6 @@ pub fn unzip(
     let file = fs::File::open(&file_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
 
-    // Assuming all contents are under a single top-level directory within the ZIP.
     // Extract the name of the top-level directory from the first entry's path.
     let top_level_dir = archive.by_index(0)
         .map_err(|_| ZipError::InvalidArchive("Archive is empty or cannot read first entry"))?
