@@ -11,14 +11,21 @@
   },
   "tauri": {
     "allowlist": {
-      "fs": {
+      "all": false,
+      "path": {
         "all": true
+      },
+      "fs": {
+        "all": false,
+        "scope": [
+          "$RESOURCE/*"
+        ]
       },
       "dialog": {
         "open": true,
         "save": true
       },
-      "all": false,
+      
       "shell": {
         "all": false,
         "open": true
@@ -48,6 +55,9 @@
         "icons/128x128@2x.png",
         "icons/icon.icns",
         "icons/icon.ico"
+      ],
+      "resources": [
+        "resources/*"
       ]
     }
   }
