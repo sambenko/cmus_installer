@@ -1,16 +1,17 @@
 use std::{fs, io};
 use std::path::Path;
-use tauri::Window;
+use tauri::{Manager, Window};
 use zip::result::ZipError;
 use log::info;
 
 pub fn unzip(
-    _window: Window,
+    window: Window,
     file_path: String,
     output_directory: String,
 ) -> Result<(), ZipError> {
     let file = fs::File::open(&file_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
+    let archive_length = archive.len();
 
     // Extract the name of the top-level directory from the first entry's path.
     let top_level_dir = archive.by_index(0)
@@ -44,6 +45,8 @@ pub fn unzip(
             let mut outfile = fs::File::create(&outpath)?;
             io::copy(&mut file, &mut outfile)?;
         }
+
+        window.emit_all("progress", &format!("Unzip progress: {}%", (i as f64 / archive_length as f64) * 100.0)).ok();
     }
     
 
