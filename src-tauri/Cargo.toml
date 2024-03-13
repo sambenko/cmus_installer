@@ -1,5 +1,5 @@
 [package]
-name = "product_installer"
+name = "cmus_installer"
 version = "0.0.0"
 description = "A Tauri App"
 authors = ["you"]
