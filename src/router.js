@@ -11,7 +11,7 @@ const routes = [
     children: [
       { path: '', name: "StartScreen", component: StartScreen },
       { path: 'installation', name: "Installation", component: InstallationScreen },
-      { path: '/installation-progress/:version/:path', name: "installation-progress", component: InstallationProgress, props: true },
+      { path: '/installation-progress/:version/:path', name: "installation-progress", component: InstallationProgress },
     ],
   },
 ];
