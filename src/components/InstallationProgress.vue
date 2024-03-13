@@ -1,35 +1,22 @@
 <template>
   <div class="installation-progress-container">
+    <div class="installation-progress-header">
+      <div class="installation-progress-heading">
+        <h1>C* Music Player Installer</h1>
+      </div>
+    </div>
     <div class="progress-section">
       <div class="progress-bar-background">
-        <div
-          v-if="isInstalling"
-          class="progress-indicator"
-          :style="{ width: `${progress}%` }"
-        ></div>
+        <div v-if="isInstalling" class="progress-indicator" :style="{ width: `${progress}%` }"></div>
       </div>
     </div>
     <div class="output-section">
-      <p v-if="!isInstalling && logs.length === 0">
-        Waiting for installation to start...
-      </p>
+      <p v-if="!isInstalling && logs.length === 0">Waiting for installation to start...</p>
       <p v-for="(log, index) in logs" :key="index">{{ log }}</p>
     </div>
     <div class="button-container">
-      <button
-        v-show="isInstalling"
-        class="cancel-button"
-        @click="cancelInstallation"
-      >
-        Cancel
-      </button>
-      <button
-        v-show="!isInstalling"
-        class="finish-button"
-        @click="finishInstallation"
-      >
-        Finish
-      </button>
+      <button v-show="isInstalling" class="cancel-button" @click="cancelInstallation">Cancel</button>
+      <button v-show="!isInstalling" class="finish-button" @click="finishInstallation">Finish</button>
     </div>
   </div>
 </template>
@@ -38,7 +25,9 @@
 import { ref, onMounted, nextTick } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
-import { appWindow } from '@tauri-apps/api/window';
+import { appWindow } from "@tauri-apps/api/window";
+import { join } from "@tauri-apps/api/path";
+import { resolveResource } from "@tauri-apps/api/path";
 
 export default {
   name: "InstallationProgress",
@@ -90,7 +79,7 @@ export default {
       }
     });
 
-      const finishInstallation = async () => {
+    const finishInstallation = async () => {
       console.log("Finish clicked");
       await appWindow.close();
     };
@@ -100,20 +89,41 @@ export default {
       logs.value.push("Starting installation...");
       let modified_version = version.substring(1);
       try {
-        const downloadResult = await invoke("download_cmus", {
-          version: version,
-          targetPath: path,
-        });
-        logs.value.push(downloadResult);
-        const decompressResult = await invoke("decompress", {
-          sourcePath: `${path}/cmus-${version}.zip`,
-          targetPath: path,
-        });
-        logs.value.push(decompressResult);
-        const installResult = await invoke("install_cmus", {
-          targetPath: `${path}/cmus-${modified_version}`,
-        });
-        logs.value.push(installResult);
+        if (version.includes("(default)")) {
+          const embeddedVersionPath = await join(
+            await resolveResource('resources'),
+            "cmus-2.10.0"
+          );
+
+          const localVersionPath = await join(path, "cmus-2.10.0");
+
+          // Copy the embedded version directory to the local environment
+          await invoke("copy_dir", {
+            from: embeddedVersionPath,
+            to: localVersionPath,
+          });
+
+          const installResult = await invoke("install_cmus", {
+            targetPath: `${path}/cmus-2.10.0`,
+          });
+          logs.value.push(installResult);
+          scrollToBottom();
+        } else {
+          const downloadResult = await invoke("download_cmus", {
+            version: version,
+            targetPath: path,
+          });
+          logs.value.push(downloadResult);
+          const decompressResult = await invoke("decompress", {
+            sourcePath: `${path}/cmus-${version}.zip`,
+            targetPath: path,
+          });
+          logs.value.push(decompressResult);
+          const installResult = await invoke("install_cmus", {
+            targetPath: `${path}/cmus-${modified_version}`,
+          });
+          logs.value.push(installResult);
+        }
         scrollToBottom();
       } catch (error) {
         console.error("Installation failed:", error);
@@ -140,7 +150,20 @@ export default {
   width: 93%;
   height: 93%;
   position: relative;
-  overflow: hidden; /* Added */
+  overflow: hidden;
+}
+
+.installation-progress-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.installation-progress-heading h1 {
+  color: var(--color);
+  font-size: 2rem;
 }
 
 .progress-section {
