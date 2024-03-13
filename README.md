@@ -4,9 +4,8 @@
 
 ## TODO
 
-- [ ] progress percentages
 - [ ] working progress bar
-- [ ] cancel installation
+- [X] cancel installation
 - [ ] MacOS release
 - [ ] cross-platform release (Windows, Linux)
 - [ ] frontend tests
