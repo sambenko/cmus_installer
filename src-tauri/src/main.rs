@@ -82,7 +82,9 @@ async fn install_cmus(
     }
 
     let install_handle = tokio::spawn(install::install(window, app, target_path));
-    let result: Result<_, _> = install_handle.await;
+    let result = install_handle.await;
+
+    // let result: Result<String, _> = Err(());
 
     {
         let mut state = state_mutex.lock().unwrap();
@@ -95,11 +97,42 @@ async fn install_cmus(
     }
 }
 
+use std::fs;
+use std::path::{Path, PathBuf};
+
+#[tauri::command]
+fn copy_dir(from: &str, to: &str) -> Result<(), String> {
+    let from_path = Path::new(from);
+    let to_path = PathBuf::from(to);
+
+    if !from_path.is_dir() {
+        return Err(format!("{} is not a directory", from));
+    }
+
+    fs::create_dir_all(&to_path)
+        .map_err(|err| format!("Failed to create target directory: {}", err))?;
+
+    for entry in fs::read_dir(from_path).map_err(|err| format!("Failed to read source directory: {}", err))? {
+        let entry = entry.map_err(|err| format!("Failed to read directory entry: {}", err))?;
+        let from_entry = entry.path();
+        let to_entry = to_path.join(entry.file_name());
+
+        if entry.file_type().map_err(|err| format!("Failed to get file type: {}", err))?.is_dir() {
+            copy_dir(&from_entry.to_string_lossy(), &to_entry.to_string_lossy())?;
+        } else {
+            fs::copy(&from_entry, &to_entry)
+                .map_err(|err| format!("Failed to copy file: {}", err))?;
+        }
+    }
+
+    Ok(())
+}
+
 
 fn main() {
     tauri::Builder::default()
         .manage(Mutex::new(AppState::default()))
-        .invoke_handler(tauri::generate_handler![download_cmus, decompress, install_cmus])
+        .invoke_handler(tauri::generate_handler![download_cmus, decompress, install_cmus, copy_dir])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
