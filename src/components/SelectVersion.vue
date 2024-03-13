@@ -1,7 +1,9 @@
 <template>
   <div class="select-version-container">
     <select id="version-select" v-model="selectedVersion" class="version-select" @change="emitVersionSelected">
-      <option v-for="version in versions" :key="version" :value="version">
+      <option v-if="!hasInternet" :value="defaultVersionLabel">{{ defaultVersionLabel }}</option>
+      <option v-else :value="versions[0]" selected>{{ versions[0] }} (default)</option>
+      <option v-for="(version, index) in versionsToDisplay" :key="index" :value="version">
         {{ version }}
       </option>
     </select>
@@ -9,7 +11,7 @@
 </template>
 
 <script>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
 export default {
   name: 'SelectVersion',
@@ -17,6 +19,8 @@ export default {
   setup(_, context) {
     const selectedVersion = ref('');
     const versions = ref([]);
+    const hasInternet = ref(true);
+    const defaultVersionLabel = "v2.10.0 (default)";
 
     async function fetchVersions() {
       const repo = 'cmus/cmus';
@@ -24,8 +28,13 @@ export default {
         const response = await fetch(`https://api.github.com/repos/${repo}/tags`);
         const data = await response.json();
         versions.value = data.map((tag) => tag.name);
+        selectedVersion.value = versions.value[0];
+        emitVersionSelected();
       } catch (error) {
         console.error('Failed to fetch versions:', error);
+        hasInternet.value = false;
+        selectedVersion.value = defaultVersionLabel;
+        emitVersionSelected();
       }
     }
 
@@ -33,11 +42,21 @@ export default {
       context.emit('version-selected', selectedVersion.value);
     }
 
+    const versionsToDisplay = computed(() => {
+      if (hasInternet.value) {
+        return versions.value.slice(1);
+      }
+      return versions.value;
+    });
+
     fetchVersions();
 
     return {
       selectedVersion,
       versions,
+      hasInternet,
+      defaultVersionLabel,
+      versionsToDisplay,
       emitVersionSelected,
     };
   },
