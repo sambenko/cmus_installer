@@ -7,16 +7,34 @@
     </div>
     <div class="progress-section">
       <div class="progress-bar-background">
-        <div v-if="isInstalling" class="progress-indicator" :style="{ width: `${progress}%` }"></div>
+        <div
+          v-if="isInstalling"
+          class="progress-indicator"
+          :style="{ width: `${progress}%` }"
+        ></div>
       </div>
     </div>
     <div class="output-section">
-      <p v-if="!isInstalling && logs.length === 0">Waiting for installation to start...</p>
+      <p v-if="!isInstalling && logs.length === 0">
+        Waiting for installation to start...
+      </p>
       <p v-for="(log, index) in logs" :key="index">{{ log }}</p>
     </div>
     <div class="button-container">
-      <button v-show="isInstalling" class="cancel-button" @click="cancelInstallation">Cancel</button>
-      <button v-show="!isInstalling" class="finish-button" @click="finishInstallation">Finish</button>
+      <button
+        v-show="isInstalling"
+        class="cancel-button"
+        @click="cancelInstallation"
+      >
+        Cancel
+      </button>
+      <button
+        v-show="!isInstalling"
+        class="finish-button"
+        @click="finishInstallation"
+      >
+        Finish
+      </button>
     </div>
   </div>
 </template>
@@ -28,18 +46,20 @@ import { invoke } from "@tauri-apps/api/tauri";
 import { appWindow } from "@tauri-apps/api/window";
 import { join } from "@tauri-apps/api/path";
 import { resolveResource } from "@tauri-apps/api/path";
+import { useRoute, useRouter } from "vue-router";
 
 export default {
   name: "InstallationProgress",
-  props: {
-    version: String,
-    path: String,
-  },
-  setup(props) {
-    console.log("Received props:", props);
-    const isInstalling = ref(false);
+  setup() {
+    const route = useRoute();
+    const router = useRouter();
     const logs = ref([]);
     const progress = ref(0);
+
+    const version = route.params.version;
+    const path = route.params.path;
+
+    const isInstalling = ref(false);
 
     const scrollToBottom = () => {
       nextTick(() => {
@@ -56,24 +76,6 @@ export default {
         scrollToBottom();
       });
 
-      listen("download_progress", (e) => {
-        const percentage = e.payload.message;
-        progress.value = parseFloat(percentage);
-      });
-
-      listen("download-info", (event) => {
-        logs.value.push(event.payload.message);
-      });
-
-      listen("download-success", (event) => {
-        logs.value.push(event.payload.message);
-      });
-
-      listen("prg", (event) => {
-        logs.value.push(event.payload.message);
-      });
-
-      const { version, path } = props;
       if (version && path) {
         startInstallation(version, path);
       }
@@ -84,6 +86,28 @@ export default {
       await appWindow.close();
     };
 
+    const cancelInstallation = async () => {
+    console.log("Cancel clicked");
+    try {
+        // First, send the abort signal to the backend.
+        await invoke("abort_installation");
+        logs.value.push("Installation aborted.");
+
+        await invoke("cleanup", {
+            version: version.substring(1),
+            targetPath: path,
+        });
+        console.log("Cleanup completed successfully.");
+
+        isInstalling.value = false;
+        router.push('/installation');
+
+    } catch (error) {
+        console.error("Error during abort and cleanup:", error);
+        logs.value.push(`Error during abort and cleanup: ${error}`);
+    }
+};
+
     async function startInstallation(version, path) {
       isInstalling.value = true;
       logs.value.push("Starting installation...");
@@ -91,7 +115,7 @@ export default {
       try {
         if (version.includes("(default)")) {
           const embeddedVersionPath = await join(
-            await resolveResource('resources'),
+            await resolveResource("resources"),
             "cmus-2.10.0"
           );
 
@@ -133,7 +157,13 @@ export default {
       isInstalling.value = false;
     }
 
-    return { isInstalling, logs, progress, finishInstallation };
+    return {
+      isInstalling,
+      logs,
+      progress,
+      finishInstallation,
+      cancelInstallation,
+    };
   },
 };
 </script>

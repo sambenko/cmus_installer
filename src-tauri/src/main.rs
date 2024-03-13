@@ -76,7 +76,7 @@ async fn install_cmus(
     app: AppHandle,
     state_mutex: tauri::State<'_, Mutex<AppState>>,
     target_path: String,
-) -> Result<String, ()> {
+) -> Result<(), ()> {
     {
         let mut state = state_mutex.lock().unwrap();
         state.builder = BuilderState::Running;
@@ -93,15 +93,23 @@ async fn install_cmus(
     }
 
     match result {
-        Ok(_) => Ok("Installation successful".to_string()),
+        Ok(_) => Ok(()),
         Err(_) => Err(()),
     }
 }
 
+#[tauri::command]
+fn abort_installation(state: State<'_, Mutex<AppState>>) {
+    let mut app_state = state.lock().unwrap();
+    app_state.builder = BuilderState::Abort;
+}
+
+
+
 fn main() {
     tauri::Builder::default()
         .manage(Mutex::new(AppState::default()))
-        .invoke_handler(tauri::generate_handler![download_cmus, decompress, install_cmus, utils::cleanup, utils::copy_dir ])
+        .invoke_handler(tauri::generate_handler![download_cmus, decompress, install_cmus, abort_installation, utils::copy_dir, utils::cleanup ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
